@@ -1,3 +1,10 @@
+/**
+ * Contains msgpack adaptor implementation for boost::variant.
+ *
+ * Works for any number of template argument types of any msgpack serializable types.
+ * @author Chen Weiguang
+ */
+
 #pragma once
 
 #include "msgpack.hpp"
@@ -34,6 +41,14 @@ namespace details {
         create_packers_impl<Stream, Var, N, Ts...>(arr);
     }
 
+    /**
+     * Creates the runtime array of pack functions to call based on the type index.
+     * @tparam Stream stream type required by adaptor pack
+     * @tparam N number of elements in variant type
+     * @tparam T current msgpack serializable template argument
+     * @tparam Ts other msgpack serializable template arguments
+     * @return runtime array of pack functions in template argument order
+     */
     template <class Stream, size_t N, class T, class... Ts>
     auto create_packers() -> packer_fn_arr<Stream, boost::variant<T, Ts...>, N> {
         using Var = boost::variant<T, Ts...>;
@@ -69,6 +84,13 @@ namespace details {
         create_unpackers_impl<Var, N, Ts...>(arr);
     }
 
+    /**
+     * Creates the runtime array of unpack functions to call based on the type index.
+     * @tparam N number of elements in variant type
+     * @tparam T current msgpack serializable template argument
+     * @tparam Ts other msgpack serializable template arguments
+     * @return runtime array of unpack functions in template argument order
+     */
     template <size_t N, class T, class... Ts>
     auto create_unpackers() -> unpacker_fn_arr<boost::variant<T, Ts...>, N> {
         using Var = boost::variant<T, Ts...>;
@@ -82,6 +104,10 @@ namespace details {
 namespace msgpack {
     MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
         namespace adaptor {
+            /**
+             * Contains the pack implementation for boost::variant.
+             * @tparam Ts msgpack serializable template arguments
+             */
             template <class... Ts>
             struct pack<boost::variant<Ts...>> {
                 template <class Stream>
@@ -105,6 +131,10 @@ namespace msgpack {
                 }
             };
 
+            /**
+             * Contains the convert implementation for boost::variant.
+             * @tparam Ts msgpack serializable template arguments
+             */
             template <class... Ts>
             struct convert<boost::variant<Ts...>> {
                 auto operator()(
