@@ -1,5 +1,5 @@
 /**
- * Contains msgpack adaptor implementation for boost::variant.
+ * Contains msgpack adaptor implementation for mapbox::util::variant.
  *
  * Works for any number of template argument types of any msgpack serializable types.
  * @author Chen Weiguang
@@ -9,13 +9,13 @@
 
 #include "msgpack.hpp"
 
-#include "boost/variant.hpp"
+#include "mapbox/variant.hpp"
 
 #include <array>
 #include <cstddef>
 #include <functional>
 
-namespace details_boost {
+namespace details_mapbox {
     
     // packer section
 
@@ -35,7 +35,7 @@ namespace details_boost {
         static constexpr auto Index = N - sizeof...(Ts) - 1;
 
         arr[Index] = [](msgpack::packer<Stream> &p, const Var &v) {
-            p.pack(boost::get<T>(v));
+            p.pack(v.template get<T>());
         };
 
         create_packers_impl<Stream, Var, N, Ts...>(arr);
@@ -50,8 +50,8 @@ namespace details_boost {
      * @return runtime array of pack functions in template argument order
      */
     template <class Stream, size_t N, class T, class... Ts>
-    auto create_packers() -> packer_fn_arr<Stream, boost::variant<T, Ts...>, N> {
-        using Var = boost::variant<T, Ts...>;
+    auto create_packers() -> packer_fn_arr<Stream, mapbox::util::variant<T, Ts...>, N> {
+        using Var = mapbox::util::variant<T, Ts...>;
 
         packer_fn_arr<Stream, Var, N> arr;
         create_packers_impl<Stream, Var, N, T, Ts...>(arr);
@@ -92,8 +92,8 @@ namespace details_boost {
      * @return runtime array of unpack functions in template argument order
      */
     template <size_t N, class T, class... Ts>
-    auto create_unpackers() -> unpacker_fn_arr<boost::variant<T, Ts...>, N> {
-        using Var = boost::variant<T, Ts...>;
+    auto create_unpackers() -> unpacker_fn_arr<mapbox::util::variant<T, Ts...>, N> {
+        using Var = mapbox::util::variant<T, Ts...>;
 
         unpacker_fn_arr<Var, N> arr;
         create_unpackers_impl<Var, N, T, Ts...>(arr);
@@ -105,19 +105,19 @@ namespace msgpack {
     MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
         namespace adaptor {
             /**
-             * Contains the pack implementation for boost::variant.
+             * Contains the pack implementation for mapbox::util::variant.
              * @tparam Ts msgpack serializable template arguments
              */
             template <class... Ts>
-            struct pack<boost::variant<Ts...>> {
+            struct pack<mapbox::util::variant<Ts...>> {
                 template <class Stream>
                 auto operator()(
                     msgpack::packer<Stream> &p,
-                    const boost::variant<Ts...> &v) const
+                    const mapbox::util::variant<Ts...> &v) const
                     -> msgpack::packer<Stream> & {
 
                     static constexpr auto N = sizeof...(Ts);
-                    static const auto PACKERS = details_boost::create_packers<Stream, N, Ts...>();
+                    static const auto PACKERS = details_mapbox::create_packers<Stream, N, Ts...>();
 
                     p.pack_array(2);
 
@@ -132,18 +132,18 @@ namespace msgpack {
             };
 
             /**
-             * Contains the convert implementation for boost::variant.
+             * Contains the convert implementation for mapbox::util::variant.
              * @tparam Ts msgpack serializable template arguments
              */
             template <class... Ts>
-            struct convert<boost::variant<Ts...>> {
+            struct convert<mapbox::util::variant<Ts...>> {
                 auto operator()(
                     const msgpack::object &o,
-                    boost::variant<Ts...> &v) const
+                    mapbox::util::variant<Ts...> &v) const
                     -> const msgpack::object & {
 
                     static constexpr auto N = sizeof...(Ts);
-                    static const auto UNPACKERS = details_boost::create_unpackers<N, Ts...>();
+                    static const auto UNPACKERS = details_mapbox::create_unpackers<N, Ts...>();
 
                     if (o.type != msgpack::type::ARRAY) throw msgpack::type_error();
                     if (o.via.array.size != 2) throw msgpack::type_error();

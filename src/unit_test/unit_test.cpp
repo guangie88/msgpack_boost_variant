@@ -1,10 +1,12 @@
 #include "gtest/gtest.h"
 
 #include "msgpack_boost_variant.hpp"
+#include "msgpack_mapbox_variant.hpp"
 
 #include "msgpack.hpp"
 
 #include "boost/variant.hpp"
+#include "mapbox/variant.hpp"
 
 #include <sstream>
 #include <string>
@@ -14,7 +16,12 @@
 #include <vector>
 
 // boost
-using boost::variant;
+template <class... Ts>
+using bvar = boost::variant<Ts...>;
+
+// mapbox
+template <class... Ts>
+using mvar = mapbox::util::variant<Ts...>;
 
 // std
 using std::pair;
@@ -48,7 +55,7 @@ auto unpack(const std::string &str) -> T {
 }
 
 TEST(MsgpackBoostVar, Simple) {
-    using var_t = variant<double, int, bool>;
+    using var_t = bvar<double, int, bool>;
 
     // v1 -> v2 -> v3 -> v1
     var_t v1 = 3.14;
@@ -77,7 +84,7 @@ TEST(MsgpackBoostVar, Complex) {
     using vec_t = vector<status>;
     using map_t = unordered_map<string, unordered_set<status>>;
 
-    using var_t = variant<pair_t, vec_t, map_t>;
+    using var_t = bvar<pair_t, vec_t, map_t>;
 
     // v1 -> v2 -> v3 -> v1
     var_t v1 = pair_t("Hello World", status::completed);
@@ -125,6 +132,86 @@ TEST(MsgpackBoostVar, Complex) {
     EXPECT_TRUE(pair_cmp(boost::get<pair_t>(v2)));
     EXPECT_TRUE(vec_cmp(boost::get<vec_t>(v3)));
     EXPECT_TRUE(map_cmp(boost::get<map_t>(v1)));
+}
+
+TEST(MsgpackMapboxVar, Simple) {
+    using var_t = mvar<double, int, bool>;
+
+    // v1 -> v2 -> v3 -> v1
+    var_t v1 = 3.14;
+    var_t v2 = 7;
+    var_t v3 = true;
+
+    EXPECT_EQ(3.14, v1.get<double>());
+    EXPECT_EQ(7, v2.get<int>());
+    EXPECT_EQ(true, v3.get<bool>());
+
+    const auto v1_packed_str = pack(v1);
+    const auto v2_packed_str = pack(v2);
+    const auto v3_packed_str = pack(v3);
+
+    v2 = unpack<var_t>(v1_packed_str);
+    v3 = unpack<var_t>(v2_packed_str);
+    v1 = unpack<var_t>(v3_packed_str);
+
+    EXPECT_EQ(3.14, v2.get<double>());
+    EXPECT_EQ(7, v3.get<int>());
+    EXPECT_EQ(true, v1.get<bool>());
+}
+
+TEST(MsgpackMapboxVar, Complex) {
+    using pair_t = pair<string, status>;
+    using vec_t = vector<status>;
+    using map_t = unordered_map<string, unordered_set<status>>;
+
+    using var_t = mvar<pair_t, vec_t, map_t>;
+
+    // v1 -> v2 -> v3 -> v1
+    var_t v1 = pair_t("Hello World", status::completed);
+    var_t v2 = vec_t{status::inprogress, status::completed, status::error};
+    var_t v3 = map_t{{"one", {status::error, status::inprogress}}, {"two", {status::completed, status::error}}};
+
+    const auto pair_cmp = [](const pair_t &p) {
+        return
+            p.first == "Hello World" &&
+            p.second == status::completed;
+    };
+
+    const auto vec_cmp = [](const vec_t &v) {
+        return
+            v.at(0) == status::inprogress &&
+            v.at(1) == status::completed &&
+            v.at(2) == status::error;
+    };
+
+    const auto map_cmp = [](const map_t &m) {
+        const auto &ones = m.at("one");
+        const auto &twos = m.at("two");
+
+        const auto exists = [](const unordered_set<status> &s, const status rhs) {
+            return s.find(rhs) != s.cend();
+        };
+
+        return
+            exists(ones, status::error) && exists(ones, status::inprogress) && !exists(ones, status::completed) &&
+            exists(twos, status::completed) && exists(twos, status::error) && !exists(twos, status::inprogress);
+    };
+
+    EXPECT_TRUE(pair_cmp(v1.get<pair_t>()));
+    EXPECT_TRUE(vec_cmp(v2.get<vec_t>()));
+    EXPECT_TRUE(map_cmp(v3.get<map_t>()));
+
+    const auto v1_packed_str = pack(v1);
+    const auto v2_packed_str = pack(v2);
+    const auto v3_packed_str = pack(v3);
+
+    v2 = unpack<var_t>(v1_packed_str);
+    v3 = unpack<var_t>(v2_packed_str);
+    v1 = unpack<var_t>(v3_packed_str);
+
+    EXPECT_TRUE(pair_cmp(v2.get<pair_t>()));
+    EXPECT_TRUE(vec_cmp(v3.get<vec_t>()));
+    EXPECT_TRUE(map_cmp(v1.get<map_t>()));
 }
 
 int main(int argc, char * argv[]) {
